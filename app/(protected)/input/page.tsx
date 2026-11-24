@@ -155,26 +155,14 @@ export default function InputPage() {
             htmlFor="sid"
             required
             error={errors.sid}
-            hint='Wajib diawali "SDG-". Contoh: SDG-234, SDG-2024-001'
+            hint='Wajib diawali "SDG-". Contoh: SDG-001, SDG-234'
           >
             <input
               id="sid"
               type="text"
               value={sid}
               onChange={(e) => setSid(e.target.value)}
-              placeholder={
-                isPM
-                  ? qcDivision === 'QC_WEB'
-                    ? 'SDG-WEB-001'
-                    : qcDivision === 'QC_MOBILE'
-                    ? 'SDG-MOB-001'
-                    : 'SDG-API-001'
-                  : user?.role === 'QC_MOBILE'
-                  ? 'SDG-MOB-001'
-                  : user?.role === 'QC_API'
-                  ? 'SDG-API-001'
-                  : 'SDG-WEB-001'
-              }
+              placeholder="SDG-001"
               className={`${INPUT_CLASS} font-mono`}
             />
           </FormField>

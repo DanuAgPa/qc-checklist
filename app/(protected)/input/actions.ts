@@ -48,9 +48,9 @@ export async function saveTestResultAction(input: unknown): Promise<SaveTestResu
       ? (qcDivision || 'QC_WEB')
       : (session.role as Role);
 
-  // 3. Konfirmasi retest bila entri terakhir untuk SID ini berstatus PASS.
+  // 3. Konfirmasi retest bila entri terakhir untuk SID ini di divisi ini berstatus PASS.
   const latestForSid = await prisma.testResult.findFirst({
-    where: { sid },
+    where: { sid, division: targetDivision },
     orderBy: { createdAt: 'desc' },
     select: { status: true },
   });
@@ -62,9 +62,11 @@ export async function saveTestResultAction(input: unknown): Promise<SaveTestResu
     };
   }
 
-  // 4. attemptNumber dihitung di server: jumlah entri sebelumnya dengan SID sama + 1.
+  // 4. attemptNumber dihitung di server: jumlah entri sebelumnya dengan SID sama di divisi yang sama + 1.
   const saved = await prisma.$transaction(async (tx) => {
-    const previousAttempts = await tx.testResult.count({ where: { sid } });
+    const previousAttempts = await tx.testResult.count({
+      where: { sid, division: targetDivision },
+    });
     const attemptNumber = previousAttempts + 1;
 
     return tx.testResult.create({
