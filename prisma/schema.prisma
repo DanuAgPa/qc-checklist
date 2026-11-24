@@ -1,0 +1,60 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  QC_WEB
+  QC_MOBILE
+  QC_API
+  PRODUCT_MANAGER
+}
+
+enum Environment {
+  DEMO
+  PRODUCTION
+}
+
+enum TestStatus {
+  PASS
+  FAIL
+}
+
+model User {
+  id           String       @id @default(cuid())
+  name         String
+  email        String       @unique
+  passwordHash String
+  role         Role
+  isActive     Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  testResults  TestResult[]
+}
+
+model TestResult {
+  id            String      @id @default(cuid())
+  sid           String
+  taskTitle     String
+  tester        User        @relation(fields: [testerId], references: [id])
+  testerId      String
+  testedAt      DateTime
+  environment   Environment
+  status        TestStatus
+  note          String?
+  attemptNumber Int
+  createdAt     DateTime    @default(now())
+
+  @@index([sid])
+}
+
+model LoginAttempt {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  attemptCount  Int       @default(0)
+  lastAttemptAt DateTime  @default(now())
+  lockedUntil   DateTime?
+}
