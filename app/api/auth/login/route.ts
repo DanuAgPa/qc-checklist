@@ -4,21 +4,26 @@ import { verifyPassword } from '@/lib/password';
 import { createToken, setAuthCookie } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
-  const body = await request.json() as { email?: string; password?: string };
-  const { email, password } = body;
+  const body = (await request.json()) as {
+    username?: string;
+    email?: string;
+    password?: string;
+  };
+  const rawIdentifier = body.username || body.email;
+  const { password } = body;
 
-  if (!email || !password) {
+  if (!rawIdentifier || !password) {
     return NextResponse.json(
-      { error: 'Email dan password wajib diisi.' },
+      { error: 'Username dan password wajib diisi.' },
       { status: 400 }
     );
   }
 
-  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedIdentifier = rawIdentifier.trim().toLowerCase();
 
   // Check rate limit
   const loginAttempt = await prisma.loginAttempt.findUnique({
-    where: { email: normalizedEmail },
+    where: { email: normalizedIdentifier },
   });
 
   if (loginAttempt && loginAttempt.lockedUntil && loginAttempt.lockedUntil > new Date()) {
@@ -30,15 +35,21 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Find user
-  const user = await prisma.user.findUnique({
-    where: { email: normalizedEmail },
+  // Find user by email, prefix of email (e.g. 'pm' for 'pm@qc.local'), or name
+  const user = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { email: normalizedIdentifier },
+        { email: { startsWith: `${normalizedIdentifier}@` } },
+        { name: { equals: normalizedIdentifier, mode: 'insensitive' } },
+      ],
+    },
   });
 
   if (!user) {
-    await recordFailedAttempt(normalizedEmail);
+    await recordFailedAttempt(normalizedIdentifier);
     return NextResponse.json(
-      { error: 'Email atau password salah.' },
+      { error: 'Username atau password salah.' },
       { status: 401 }
     );
   }
@@ -54,16 +65,21 @@ export async function POST(request: NextRequest) {
   // Verify password
   const isValid = await verifyPassword(password, user.passwordHash);
   if (!isValid) {
-    await recordFailedAttempt(normalizedEmail);
+    await recordFailedAttempt(normalizedIdentifier);
     return NextResponse.json(
-      { error: 'Email atau password salah.' },
+      { error: 'Username atau password salah.' },
       { status: 401 }
     );
   }
 
-  // Success — reset attempts
+  // Success — reset attempts for both identifier and user email
   await prisma.loginAttempt.deleteMany({
-    where: { email: normalizedEmail },
+    where: {
+      OR: [
+        { email: normalizedIdentifier },
+        { email: user.email },
+      ],
+    },
   });
 
   // Create token and set cookie

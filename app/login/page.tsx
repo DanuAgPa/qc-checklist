@@ -8,16 +8,16 @@ import { ThemeProvider } from '@/app/components/ThemeProvider';
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const emailRef = useRef<HTMLInputElement>(null);
+  const usernameRef = useRef<HTMLInputElement>(null);
 
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    emailRef.current?.focus();
+    usernameRef.current?.focus();
   }, []);
 
   async function handleSubmit(e: FormEvent) {
@@ -29,7 +29,7 @@ function LoginForm() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ username, password }),
       });
 
       const data = await res.json() as { error?: string; user?: { role: string } };
@@ -94,18 +94,18 @@ function LoginForm() {
     return (
       <>
         <div className="space-y-2">
-          <label htmlFor="email" className="block text-[13px] font-semibold text-label">
-            Email
+          <label htmlFor="username" className="block text-[13px] font-semibold text-label">
+            Username
           </label>
           <input
-            ref={emailRef}
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="nama@email.com"
+            ref={usernameRef}
+            id="username"
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="Masukkan username"
             required
-            autoComplete="email"
+            autoComplete="username"
             className={inputClass}
           />
         </div>
