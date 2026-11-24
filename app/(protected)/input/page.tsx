@@ -6,7 +6,13 @@ import { saveTestResultAction } from './actions';
 import { FormField } from '@/app/components/FormField';
 import { Badge } from '@/app/components/Badge';
 import { testResultSchema, zodFieldErrors } from '@/lib/validation';
-import type { Environment, TestStatus } from '@/app/types';
+import type { Environment, TestStatus, Role } from '@/app/types';
+
+const QC_DIVISIONS = [
+  { value: 'QC_WEB' as const, label: 'QC Web', icon: '🌐' },
+  { value: 'QC_MOBILE' as const, label: 'QC Mobile', icon: '📱' },
+  { value: 'QC_API' as const, label: 'QC API', icon: '⚡' },
+] as const;
 
 function getTodayISO(): string {
   const d = new Date();
@@ -23,6 +29,11 @@ export default function InputPage() {
   const { user } = useAuth();
   const formRef = useRef<HTMLFormElement | null>(null);
 
+  const isPM = user?.role === 'PRODUCT_MANAGER';
+  const [qcDivision, setQcDivision] = useState<'QC_WEB' | 'QC_MOBILE' | 'QC_API'>('QC_WEB');
+  const [selectedTesterId, setSelectedTesterId] = useState<string>('');
+  const [testersList, setTestersList] = useState<Array<{ id: string; name: string; role: Role }>>([]);
+
   const [sid, setSid] = useState('');
   const [title, setTitle] = useState('');
   const [date, setDate] = useState(getTodayISO());
@@ -35,6 +46,38 @@ export default function InputPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [retestModal, setRetestModal] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (isPM) {
+      fetch('/api/users')
+        .then((res) => (res.ok ? res.json() : Promise.reject(res)))
+        .then((data) => {
+          if (data.users && Array.isArray(data.users)) {
+            const list = data.users
+              .filter((u: { isActive: boolean; role: string }) => u.isActive && u.role !== 'PRODUCT_MANAGER')
+              .map((u: { id: string; name: string; role: Role }) => ({ id: u.id, name: u.name, role: u.role }));
+            setTestersList(list);
+            const firstMatching = list.find((t: { role: Role }) => t.role === qcDivision);
+            if (firstMatching) {
+              setSelectedTesterId(firstMatching.id);
+            }
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isPM]);
+
+  function handleDivisionChange(newDiv: 'QC_WEB' | 'QC_MOBILE' | 'QC_API') {
+    setQcDivision(newDiv);
+    const matching = testersList.filter((t) => t.role === newDiv);
+    if (matching.length > 0) {
+      setSelectedTesterId(matching[0].id);
+    } else {
+      setSelectedTesterId('');
+    }
+  }
+
+  const availableTesters = testersList.filter((t) => t.role === qcDivision);
+
   function validate(): Record<string, string> {
     const parsed = testResultSchema.safeParse({
       sid,
@@ -43,6 +86,8 @@ export default function InputPage() {
       environment,
       status,
       notes: notes.trim() || undefined,
+      qcDivision: isPM ? qcDivision : undefined,
+      testerId: isPM && selectedTesterId ? selectedTesterId : undefined,
     });
     return parsed.success ? {} : zodFieldErrors(parsed.error);
   }
@@ -62,6 +107,8 @@ export default function InputPage() {
         status,
         notes: notes.trim() || undefined,
         confirmRetest: confirmRetest || undefined,
+        qcDivision: isPM ? qcDivision : undefined,
+        testerId: isPM && selectedTesterId ? selectedTesterId : undefined,
       });
 
       if (res.needsRetestConfirm) {
@@ -151,7 +198,19 @@ export default function InputPage() {
               type="text"
               value={sid}
               onChange={(e) => setSid(e.target.value)}
-              placeholder="SDG-2024-001"
+              placeholder={
+                isPM
+                  ? qcDivision === 'QC_WEB'
+                    ? 'SDG-WEB-001'
+                    : qcDivision === 'QC_MOBILE'
+                    ? 'SDG-MOB-001'
+                    : 'SDG-API-001'
+                  : user?.role === 'QC_MOBILE'
+                  ? 'SDG-MOB-001'
+                  : user?.role === 'QC_API'
+                  ? 'SDG-API-001'
+                  : 'SDG-WEB-001'
+              }
               className={`${INPUT_CLASS} font-mono`}
             />
           </FormField>
@@ -173,17 +232,72 @@ export default function InputPage() {
             />
           </FormField>
 
+          {/* Pilihan Divisi QC (Khusus Product Manager) */}
+          {isPM && (
+            <FormField label="Kategori / Divisi QC" required error={errors.qcDivision}>
+              <div className="grid grid-cols-3 rounded-[8px] border border-border p-1 bg-surface-hover/50 gap-1.5 w-full">
+                {QC_DIVISIONS.map((div) => {
+                  const isSelected = qcDivision === div.value;
+                  return (
+                    <button
+                      key={div.value}
+                      type="button"
+                      onClick={() => handleDivisionChange(div.value)}
+                      className={`h-[42px] px-2 sm:px-3 text-[13px] sm:text-[14px] rounded-[6px] transition-all duration-150 font-semibold flex items-center justify-center gap-1.5 cursor-pointer ${
+                        isSelected
+                          ? 'bg-accent text-white shadow-xs'
+                          : 'text-text-muted hover:text-text hover:bg-surface'
+                      }`}
+                    >
+                      <span>{div.icon}</span>
+                      <span>{div.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[12px] text-text-muted mt-1.5">
+                Data testing ini akan otomatis dimasukkan ke dalam kategori divisi yang Anda pilih.
+              </p>
+            </FormField>
+          )}
+
           {/* Tester + Tanggal */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <FormField label="Tester" htmlFor="tester">
-              <input
-                id="tester"
-                type="text"
-                value={user?.name || ''}
-                readOnly
-                disabled
-                className={`${INPUT_CLASS} bg-surface-hover cursor-not-allowed text-text-muted font-medium`}
-              />
+              {isPM && availableTesters.length > 0 ? (
+                <div className="relative">
+                  <select
+                    id="tester"
+                    value={selectedTesterId || availableTesters[0]?.id || ''}
+                    onChange={(e) => setSelectedTesterId(e.target.value)}
+                    className={`${INPUT_CLASS} pr-9 cursor-pointer appearance-none font-medium`}
+                  >
+                    {availableTesters.map((t) => (
+                      <option key={t.id} value={t.id} className="bg-surface text-text">
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-text-muted">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+              ) : (
+                <input
+                  id="tester"
+                  type="text"
+                  value={
+                    isPM
+                      ? `Product Manager (${qcDivision === 'QC_WEB' ? 'QC Web' : qcDivision === 'QC_MOBILE' ? 'QC Mobile' : 'QC API'})`
+                      : user?.name || ''
+                  }
+                  readOnly
+                  disabled
+                  className={`${INPUT_CLASS} bg-surface-hover cursor-not-allowed text-text-muted font-medium`}
+                />
+              )}
             </FormField>
 
             <FormField label="Tanggal" htmlFor="date" required error={errors.date}>

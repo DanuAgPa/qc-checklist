@@ -28,6 +28,10 @@ export const testResultSchema = z.object({
     .transform((v) => (v ? v : undefined)),
   /** Konfirmasi dari pengguna bila SID terakhir berstatus PASS. */
   confirmRetest: z.boolean().optional(),
+  /** Kategori divisi QC yang dipilih oleh Product Manager. */
+  qcDivision: z.enum(['QC_WEB', 'QC_MOBILE', 'QC_API']).optional(),
+  /** ID Tester pilihan Product Manager. */
+  testerId: z.string().optional(),
 });
 
 export type TestResultInput = z.input<typeof testResultSchema>;

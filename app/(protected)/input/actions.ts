@@ -34,9 +34,32 @@ export async function saveTestResultAction(input: unknown): Promise<SaveTestResu
     return { ok: false, error: 'Periksa kembali isian form.', fieldErrors: zodFieldErrors(parsed.error) };
   }
 
-  const { sid, title, date, environment, status, notes, confirmRetest } = parsed.data;
+  const { sid, title, date, environment, status, notes, confirmRetest, qcDivision, testerId } = parsed.data;
 
   const testDate = parseDateISO(date) ?? new Date();
+
+  // Tentukan testerId berdasarkan role pengguna
+  let targetTesterId = session.userId;
+  if (session.role === 'PRODUCT_MANAGER') {
+    if (testerId) {
+      const targetUser = await prisma.user.findUnique({
+        where: { id: testerId },
+        select: { id: true, role: true },
+      });
+      if (targetUser) {
+        targetTesterId = targetUser.id;
+      }
+    } else if (qcDivision) {
+      const divisionUser = await prisma.user.findFirst({
+        where: { role: qcDivision, isActive: true },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      });
+      if (divisionUser) {
+        targetTesterId = divisionUser.id;
+      }
+    }
+  }
 
   // 3. Konfirmasi retest bila entri terakhir untuk SID ini berstatus PASS.
   const latestForSid = await prisma.testResult.findFirst({
@@ -61,7 +84,7 @@ export async function saveTestResultAction(input: unknown): Promise<SaveTestResu
       data: {
         sid,
         taskTitle: title,
-        testerId: session.userId,
+        testerId: targetTesterId,
         testedAt: testDate,
         environment: environment === 'Production' ? 'PRODUCTION' : 'DEMO',
         status: status === 'PASS' ? 'PASS' : 'FAIL',
