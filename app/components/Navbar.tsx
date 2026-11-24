@@ -47,17 +47,10 @@ export function Navbar() {
     router.refresh();
   }
 
-  // Tutup panel mobile saat klik di luar
+  // Otomatis tutup panel mobile saat berpindah halaman
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (!mobileOpen) return;
-      if (navRef.current && !navRef.current.contains(event.target as Node)) {
-        setMobileOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [mobileOpen]);
+    setMobileOpen(false);
+  }, [pathname]);
 
   return (
     <>
@@ -181,7 +174,6 @@ export function Navbar() {
                   <Link
                     key={item.href}
                     href={item.href}
-                    onClick={() => setMobileOpen(false)}
                     className={`flex items-center h-[42px] px-3.5 rounded-[8px] text-[14px] transition-colors duration-150 ${
                       isActive
                         ? 'bg-accent/10 text-[var(--accent-text)] font-semibold border border-accent/20'
