@@ -6,6 +6,7 @@ import { isOneOf, ALL_ROLES } from '@/lib/access';
 import { testResultSchema, zodFieldErrors } from '@/lib/validation';
 import { parseDateISO } from '@/lib/format';
 import { revalidatePath } from 'next/cache';
+import type { Role } from '@/app/types';
 
 export interface SaveTestResultResult {
   ok: boolean;
@@ -34,32 +35,18 @@ export async function saveTestResultAction(input: unknown): Promise<SaveTestResu
     return { ok: false, error: 'Periksa kembali isian form.', fieldErrors: zodFieldErrors(parsed.error) };
   }
 
-  const { sid, title, date, environment, status, notes, confirmRetest, qcDivision, testerId } = parsed.data;
+  const { sid, title, date, environment, status, notes, confirmRetest, qcDivision } = parsed.data;
 
   const testDate = parseDateISO(date) ?? new Date();
 
-  // Tentukan testerId berdasarkan role pengguna
-  let targetTesterId = session.userId;
-  if (session.role === 'PRODUCT_MANAGER') {
-    if (testerId) {
-      const targetUser = await prisma.user.findUnique({
-        where: { id: testerId },
-        select: { id: true, role: true },
-      });
-      if (targetUser) {
-        targetTesterId = targetUser.id;
-      }
-    } else if (qcDivision) {
-      const divisionUser = await prisma.user.findFirst({
-        where: { role: qcDivision, isActive: true },
-        orderBy: { createdAt: 'asc' },
-        select: { id: true },
-      });
-      if (divisionUser) {
-        targetTesterId = divisionUser.id;
-      }
-    }
-  }
+  // Tester selalu user yang sedang login (misal Product Manager)
+  const targetTesterId = session.userId;
+
+  // Divisi/kategori ditentukan dari pilihan PM atau role QC yang bersangkutan
+  const targetDivision: Role =
+    session.role === 'PRODUCT_MANAGER'
+      ? (qcDivision || 'QC_WEB')
+      : (session.role as Role);
 
   // 3. Konfirmasi retest bila entri terakhir untuk SID ini berstatus PASS.
   const latestForSid = await prisma.testResult.findFirst({
@@ -85,6 +72,7 @@ export async function saveTestResultAction(input: unknown): Promise<SaveTestResu
         sid,
         taskTitle: title,
         testerId: targetTesterId,
+        division: targetDivision,
         testedAt: testDate,
         environment: environment === 'Production' ? 'PRODUCTION' : 'DEMO',
         status: status === 'PASS' ? 'PASS' : 'FAIL',

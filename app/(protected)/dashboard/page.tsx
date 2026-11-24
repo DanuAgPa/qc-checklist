@@ -174,7 +174,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
   const where: Prisma.TestResultWhereInput = {};
   if (targetRole) {
-    where.tester = { role: targetRole };
+    where.OR = [
+      { division: targetRole },
+      { division: null, tester: { role: targetRole } },
+    ];
   }
   if (env) where.environment = env;
   if (from || toExclusive) {
@@ -184,7 +187,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   }
 
   const conditions: Prisma.Sql[] = [Prisma.sql`TRUE`];
-  if (targetRole) conditions.push(Prisma.sql`u.role = ${targetRole}::"Role"`);
+  if (targetRole) conditions.push(Prisma.sql`(t.division = ${targetRole}::"Role" OR (t.division IS NULL AND u.role = ${targetRole}::"Role"))`);
   if (env) conditions.push(Prisma.sql`t.environment = ${env}::"Environment"`);
   if (from) conditions.push(Prisma.sql`t."testedAt" >= ${from}`);
   if (toExclusive) conditions.push(Prisma.sql`t."testedAt" < ${toExclusive}`);

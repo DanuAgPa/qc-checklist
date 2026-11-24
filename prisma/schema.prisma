@@ -41,6 +41,7 @@ model TestResult {
   taskTitle     String
   tester        User        @relation(fields: [testerId], references: [id])
   testerId      String
+  division      Role?
   testedAt      DateTime
   environment   Environment
   status        TestStatus
@@ -49,6 +50,7 @@ model TestResult {
   createdAt     DateTime    @default(now())
 
   @@index([sid])
+  @@index([division])
 }
 
 model LoginAttempt {

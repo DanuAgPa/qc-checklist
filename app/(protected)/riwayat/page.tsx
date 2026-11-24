@@ -67,7 +67,10 @@ export default async function RiwayatPage({ searchParams }: RiwayatPageProps) {
   const where: Prisma.TestResultWhereInput = {};
 
   if (qcRole) {
-    where.tester = { role: qcRole };
+    where.OR = [
+      { division: qcRole },
+      { division: null, tester: { role: qcRole } },
+    ];
   }
 
   if (sidQuery) {
